@@ -18,12 +18,6 @@ except LookupError:
     nltk.download('wordnet')
 
 # Ensure SpaCy model is loaded
-try:
-    nlp = spacy.load("en_core_web_sm")
-except OSError:
-    import subprocess
-    print("Downloading SpaCy en_core_web_sm model...")
-    subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
     nlp = spacy.load("en_core_web_sm")
 
 lemmatizer = WordNetLemmatizer()

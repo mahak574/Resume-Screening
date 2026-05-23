@@ -3,7 +3,7 @@ pandas
 plotly
 sentence-transformers
 scikit-learn
-spacy
+spacy==3.8.13
 nltk
 pdfplumber
 PyPDF2
