@@ -1,0 +1,13 @@
+streamlit
+pandas
+plotly
+sentence-transformers
+scikit-learn
+spacy
+nltk
+pdfplumber
+PyPDF2
+python-docx
+pymongo
+torch
+torchvision

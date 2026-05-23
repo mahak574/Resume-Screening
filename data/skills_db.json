@@ -1,0 +1,10 @@
+{
+  "programming_languages": ["python", "java", "javascript", "c++", "c#", "ruby", "php", "swift", "kotlin", "go", "rust", "typescript", "scala", "perl", "r"],
+  "web_frameworks": ["react", "angular", "vue", "django", "flask", "spring", "express", "ruby on rails", "laravel", "asp.net", "next.js", "nuxt.js", "svelte", "fastapi", "springboot"],
+  "databases": ["mysql", "postgresql", "mongodb", "oracle", "sql server", "redis", "cassandra", "elasticsearch", "sqlite", "mariadb", "dynamodb", "couchbase", "neo4j", "firebase", "cosmosdb"],
+  "cloud": ["aws", "azure", "google cloud", "gcp", "aws ec2", "aws s3", "lambda", "azure devops", "digitalocean", "heroku", "ibm cloud", "cloudflare", "aws rds", "aws ecs", "aws eks"],
+  "devops": ["docker", "kubernetes", "jenkins", "gitlab ci", "github actions", "ansible", "terraform", "puppet", "chef", "prometheus", "grafana", "nagios", "elk stack", "travis ci", "circleci"],
+  "data_science": ["machine learning", "deep learning", "nlp", "computer vision", "pandas", "numpy", "scikit-learn", "tensorflow", "keras", "pytorch", "matplotlib", "seaborn", "tableau", "power bi", "hadoop"],
+  "soft_skills": ["communication", "teamwork", "leadership", "problem solving", "critical thinking", "time management", "adaptability", "creativity", "work ethic", "interpersonal skills", "collaboration", "emotional intelligence", "decision making", "conflict resolution", "negotiation"],
+  "mobile": ["android", "ios", "react native", "flutter", "swift", "kotlin", "objective-c", "xamarin", "ionic", "cordova", "dart", "mobile ui", "mobile ux", "app store optimization", "mobile development"]
+}
