@@ -1,7 +1,7 @@
 import json
 import re
 import os
-from typing import List, Set, Dict
+from typing import List, Set, Dict, Optional
 from ..config import SKILLS_DB_PATH
 
 # Replacement mapping for preserving technical symbols
@@ -87,9 +87,10 @@ class NLPEngine:
         tokens = [word for word in clean.split() if word not in common_stops and len(word) > 1]
         return " ".join(tokens)
 
-    def extract_skills(self, text: str) -> List[str]:
+    def extract_skills(self, text: str, additional_skills: Optional[List[str]] = None) -> List[str]:
         """
-        Extracts all recognized skills from the text based on the comprehensive skills ontology.
+        Extracts all recognized skills from the text based on the comprehensive skills ontology
+        plus any targeted job skills requested.
         """
         if not text:
             return []
@@ -97,12 +98,18 @@ class NLPEngine:
         text_lower = text.lower()
         found_skills = set()
 
-        for skill in self.all_skills:
+        search_skills = set(self.all_skills)
+        if additional_skills:
+            for s in additional_skills:
+                if s and s.strip():
+                    search_skills.add(s.strip().lower())
+
+        for skill in search_skills:
             normalized_skill = skill.lower().strip()
-            # Handle special symbols like c++, c#, .net, ci/cd
-            if any(ch in normalized_skill for ch in ['+', '#', '.', '/']):
+            # Handle special symbols like c++, c#, .net, ci/cd, scikit-learn, k-means
+            if any(ch in normalized_skill for ch in ['+', '#', '.', '/', '-']):
                 escaped = re.escape(normalized_skill)
-                pattern = rf'(?:(?<=[\s,;\(])|^){escaped}(?=[,\s\.;\)]|$)'
+                pattern = r'(?:(?<=[\s,;\(\[])|^)' + escaped + r'(?=[,\s\.;\)\]]|$)'
                 if re.search(pattern, text_lower):
                     found_skills.add(normalized_skill)
             else:

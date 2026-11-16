@@ -56,7 +56,7 @@ export default function MultiJdTab() {
   };
 
   return (
-    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px 40px' }}>
+    <div style={{ paddingBottom: '40px' }}>
       
       <div className="card" style={{ marginBottom: '24px' }}>
         <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Multi-Role Candidate Fit Matcher</h2>
@@ -159,7 +159,11 @@ export default function MultiJdTab() {
             <div>
               <span className="badge badge-success" style={{ marginBottom: '6px' }}>Analysis Completed</span>
               <h2 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a' }}>Role Fit Breakdown for {result.candidate.name}</h2>
-              <p style={{ color: '#64748b', fontSize: '0.85rem' }}>{result.candidate.email} • {result.candidate.years_experience} years experience</p>
+              <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
+                {result.candidate.email} • {result.candidate.years_experience && result.candidate.years_experience > 0 
+                  ? (result.candidate.years_experience < 1 ? `${Math.round(result.candidate.years_experience * 12)} months experience` : `${result.candidate.years_experience} years experience`) 
+                  : 'Entry Level / Fresher'}
+              </p>
             </div>
             {result.best_role && (
               <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '12px 20px', borderRadius: '10px', textAlign: 'right' }}>

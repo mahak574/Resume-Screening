@@ -36,7 +36,8 @@ class Database:
 
     def _connect_mongo(self):
         try:
-            import pymongo
+            import importlib
+            pymongo = importlib.import_module("pymongo")
             self.client = pymongo.MongoClient(self.mongo_uri, serverSelectionTimeoutMS=1500)
             self.client.server_info()
             self.db = self.client["resume_screening_ats"]

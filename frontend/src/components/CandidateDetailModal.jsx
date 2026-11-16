@@ -40,7 +40,11 @@ export default function CandidateDetailModal({ candidate, onClose, onOpenEmail, 
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>
             <Briefcase size={16} color="#d97706" />
-            <span style={{ color: '#334155' }}>{candidate.years_experience || 0} years experience</span>
+            <span style={{ color: '#334155' }}>
+              {candidate.years_experience && candidate.years_experience > 0 
+                ? (candidate.years_experience < 1 ? `${Math.round(candidate.years_experience * 12)} months experience` : `${candidate.years_experience} years experience`)
+                : 'Entry Level / Fresher'}
+            </span>
           </div>
           {candidate.linkedin && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem' }}>

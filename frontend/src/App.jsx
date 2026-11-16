@@ -59,7 +59,7 @@ export default function App() {
         analytics={analytics}
       />
 
-      <main style={{ marginTop: '20px' }}>
+      <main style={{ maxWidth: '1360px', margin: '24px auto 0', padding: '0 24px' }}>
         {activeTab === 'screen' && (
           <ScreenResumesTab 
             onOpenDetails={(c) => setDetailCandidate(c)}

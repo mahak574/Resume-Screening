@@ -1,11 +1,22 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .api.routes import router as api_router
+from .api.routes import router as api_router, skill_matcher
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Pre-warm SBERT model and skill vector cache on boot to eliminate first-request latency
+    try:
+        skill_matcher.warmup()
+    except Exception as e:
+        print(f"Lifespan warmup warning: {e}")
+    yield
 
 app = FastAPI(
     title="AI Resume Screening & Candidate Ranking API",
     description="Enterprise-ready ATS API powered by NLP, SBERT Embeddings & Hybrid Skill Matching",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
 
 # Enable CORS for React frontend (Vite defaults to port 5173, standard frontend ports allowed)

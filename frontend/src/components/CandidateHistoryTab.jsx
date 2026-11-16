@@ -45,7 +45,7 @@ export default function CandidateHistoryTab({ onOpenDetails, onOpenEmail, onOpen
   };
 
   return (
-    <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px 40px' }}>
+    <div style={{ paddingBottom: '40px' }}>
       
       {/* Header & Search */}
       <div className="card" style={{ marginBottom: '24px' }}>
@@ -123,7 +123,9 @@ export default function CandidateHistoryTab({ onOpenDetails, onOpenEmail, onOpen
                       </span>
                     </td>
                     <td style={{ padding: '14px 18px', color: '#64748b' }}>
-                      {c.years_experience ? `${c.years_experience} yrs` : '0 yrs'}
+                      {c.years_experience && c.years_experience > 0 
+                        ? (c.years_experience < 1 ? `${Math.round(c.years_experience * 12)} mos` : `${c.years_experience} yrs`) 
+                        : 'Entry Level'}
                     </td>
                     <td style={{ padding: '14px 18px' }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '300px' }}>

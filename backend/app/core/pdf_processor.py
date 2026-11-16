@@ -2,14 +2,16 @@ import pdfplumber
 import docx
 import io
 import re
+import importlib
 from datetime import datetime
 from typing import Dict, Any
 
+pypdf = None
 try:
     import pypdf
 except ImportError:
     try:
-        import PyPDF2 as pypdf
+        pypdf = importlib.import_module("PyPDF2")
     except ImportError:
         pypdf = None
 
@@ -22,8 +24,22 @@ MONTH_MAP = {
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
-    """Extracts text from a PDF file using pdfplumber, with fallback to pypdf."""
+    """Extracts text from a PDF file using fast pypdf, falling back to pdfplumber if needed."""
     text = ""
+    # 1. Fast path: pypdf (10-20ms per document)
+    if pypdf:
+        try:
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+            if len(text.strip()) > 30:
+                return text
+        except Exception:
+            pass
+
+    # 2. Fallback path: pdfplumber (heavier layout analysis for complex PDFs)
     try:
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             for page in pdf.pages:
@@ -31,16 +47,8 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
                 if page_text:
                     text += page_text + "\n"
     except Exception as e:
-        print(f"pdfplumber failed: {e}. Trying fallback reader.")
-        if pypdf:
-            try:
-                reader = pypdf.PdfReader(io.BytesIO(file_bytes))
-                for page in reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + "\n"
-            except Exception as e2:
-                print(f"Fallback PDF reader failed: {e2}")
+        print(f"PDF extraction error: {e}")
+
     return text
 
 

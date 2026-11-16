@@ -51,7 +51,8 @@ class Database:
 
     def _init_mongo(self):
         try:
-            import pymongo
+            import importlib
+            pymongo = importlib.import_module("pymongo")
             self.mongo_client = pymongo.MongoClient(self.mongo_uri, serverSelectionTimeoutMS=1500)
             self.mongo_client.server_info()
             db = self.mongo_client[MONGO_DB_NAME]

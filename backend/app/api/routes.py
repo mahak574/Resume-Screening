@@ -42,7 +42,20 @@ LEARNING_RESOURCES = {
     "spring": "https://spring.io/guides",
     "mongodb": "https://www.mongodb.com/basics",
     "redis": "https://redis.io/docs/latest/develop/get-started/",
-    "devops": "https://roadmap.sh/devops"
+    "devops": "https://roadmap.sh/devops",
+    "xgboost": "https://xgboost.readthedocs.io/en/stable/",
+    "pytorch": "https://pytorch.org/tutorials/",
+    "pandas": "https://pandas.pydata.org/docs/",
+    "scikit-learn": "https://scikit-learn.org/stable/tutorial/index.html",
+    "shap": "https://shap.readthedocs.io/en/latest/",
+    "sbert": "https://sbert.net/",
+    "sentence-transformers": "https://sbert.net/",
+    "lightgbm": "https://lightgbm.readthedocs.io/en/latest/",
+    "catboost": "https://catboost.ai/docs/",
+    "mlops": "https://ml-ops.org/",
+    "mlflow": "https://mlflow.org/docs/latest/index.html",
+    "airflow": "https://airflow.apache.org/docs/",
+    "langchain": "https://python.langchain.com/docs/get_started/introduction"
 }
 
 @router.post("/screen")
@@ -81,91 +94,112 @@ async def screen_resumes(
     # Precompute JD embedding once
     jd_embedding = skill_matcher.get_embedding(clean_jd)
 
-    candidates_results = []
+    # 2. Extract and Preprocess all resumes in batch
+    parsed_candidates = []
+    clean_resumes = []
 
-    # 2. Process Candidates
     for upload in files:
         try:
             file_bytes = await upload.read()
             raw_text = extract_text(upload.filename, file_bytes)
-            
             if not raw_text.strip():
                 continue
 
             fallback_name = upload.filename.rsplit('.', 1)[0].replace('_', ' ').replace('-', ' ').title()
             candidate_info = parse_candidate_info(raw_text, fallback_name=fallback_name)
-
-            # Preprocess and embed candidate text once
             clean_resume = nlp_engine.preprocess_text(raw_text)
-            resume_embedding = skill_matcher.get_embedding(clean_resume)
+            cand_skills = nlp_engine.extract_skills(raw_text, additional_skills=target_jd_skills)
 
-            # Calculate Semantic Similarity
-            if jd_embedding is not None and resume_embedding is not None:
-                semantic_similarity = skill_matcher.calculate_similarity_from_embeddings(resume_embedding, jd_embedding)
-            else:
-                semantic_similarity = skill_matcher.calculate_similarity_texts(clean_resume, clean_jd)
-
-            # Extract Candidate Skills
-            cand_skills = nlp_engine.extract_skills(raw_text)
-
-            # Hybrid Skill Matching
-            match_res = skill_matcher.match_skills(cand_skills, target_jd_skills)
-            matched_skills = [m["skill"] for m in match_res["matched"]]
-            missing_skills = match_res["missing"]
-            
-            # If no specific skills detected in JD, align skill score with overall semantic fit
-            if not target_jd_skills:
-                skill_score = semantic_similarity
-            else:
-                skill_score = match_res["match_percentage"] / 100.0
-
-            # Experience factor (capped at 10 years = 1.0)
-            exp_factor = min(candidate_info["years_experience"], 10.0) / 10.0
-
-            # Composite Score calculation
-            components = {
-                "semantic_similarity": semantic_similarity,
-                "skill_match": skill_score,
-                "experience_factor": exp_factor
-            }
-            score_data = skill_matcher.calculate_composite_score(components, custom_weights)
-            final_score = score_data["total_score"]
-
-            # Explanation
-            explanation = nlp_engine.explain_match(matched_skills, target_jd_skills)
-
-            # Categorize candidate skills
-            categorized = skill_matcher.categorizer.categorize_skills(matched_skills)
-
-            candidate_record = {
-                "name": candidate_info["name"],
-                "email": candidate_info["email"],
-                "phone": candidate_info["phone"],
-                "linkedin": candidate_info["linkedin"],
-                "github": candidate_info["github"],
-                "role": role,
-                "years_experience": candidate_info["years_experience"],
-                "match_score": final_score,
-                "semantic_score": score_data["breakdown"]["semantic_score"],
-                "skill_score": score_data["breakdown"]["skill_score"],
-                "extracted_skills": cand_skills,
-                "matched_skills": matched_skills,
-                "missing_skills": missing_skills,
-                "explanation": explanation
-            }
-
-            # Save to Database
-            rec_id = db.save_candidate(candidate_record)
-
-            candidates_results.append({
-                "id": rec_id,
-                **candidate_record,
-                "categorized_skills": categorized,
-                "breakdown": score_data["breakdown"]
+            parsed_candidates.append({
+                "upload": upload,
+                "raw_text": raw_text,
+                "candidate_info": candidate_info,
+                "clean_resume": clean_resume,
+                "cand_skills": cand_skills
             })
-
+            clean_resumes.append(clean_resume)
         except Exception as e:
-            print(f"Error processing {upload.filename}: {e}")
+            print(f"Error parsing {upload.filename}: {e}")
+
+    if not parsed_candidates:
+        return {
+            "total_analyzed": 0,
+            "shortlisted_count": 0,
+            "target_jd_skills": target_jd_skills,
+            "candidates": []
+        }
+
+    # Batch compute SBERT embeddings for all resumes in ONE single pass
+    resume_embeddings = skill_matcher.get_embeddings(clean_resumes) if (skill_matcher.model and clean_resumes) else None
+
+    candidates_results = []
+    for idx, item in enumerate(parsed_candidates):
+        candidate_info = item["candidate_info"]
+        clean_resume = item["clean_resume"]
+        cand_skills = item["cand_skills"]
+        raw_text = item["raw_text"]
+
+        # Calculate Semantic Similarity
+        if jd_embedding is not None and resume_embeddings is not None:
+            semantic_similarity = skill_matcher.calculate_similarity_from_embeddings(resume_embeddings[idx], jd_embedding)
+        else:
+            semantic_similarity = skill_matcher.calculate_similarity_texts(clean_resume, clean_jd)
+
+        # Hybrid Skill Matching (ultra-fast cached lookup)
+        match_res = skill_matcher.match_skills(cand_skills, target_jd_skills)
+        matched_skills = [m["skill"] for m in match_res["matched"]]
+        missing_skills = match_res["missing"]
+        
+        # If no specific skills detected in JD, align skill score with overall semantic fit
+        if not target_jd_skills:
+            skill_score = semantic_similarity
+        else:
+            skill_score = match_res["match_percentage"] / 100.0
+
+        # Experience factor (capped at 10 years = 1.0)
+        exp_factor = min(candidate_info["years_experience"], 10.0) / 10.0
+
+        # Composite Score calculation
+        components = {
+            "semantic_similarity": semantic_similarity,
+            "skill_match": skill_score,
+            "experience_factor": exp_factor
+        }
+        score_data = skill_matcher.calculate_composite_score(components, custom_weights)
+        final_score = score_data["total_score"]
+
+        # Explanation
+        explanation = nlp_engine.explain_match(matched_skills, target_jd_skills)
+
+        # Categorize candidate skills
+        categorized = skill_matcher.categorizer.categorize_skills(matched_skills)
+
+        candidate_record = {
+            "name": candidate_info["name"],
+            "email": candidate_info["email"],
+            "phone": candidate_info["phone"],
+            "linkedin": candidate_info["linkedin"],
+            "github": candidate_info["github"],
+            "role": role,
+            "years_experience": candidate_info["years_experience"],
+            "match_score": final_score,
+            "semantic_score": score_data["breakdown"]["semantic_score"],
+            "skill_score": score_data["breakdown"]["skill_score"],
+            "extracted_skills": cand_skills,
+            "matched_skills": matched_skills,
+            "missing_skills": missing_skills,
+            "explanation": explanation
+        }
+
+        # Save to Database
+        rec_id = db.save_candidate(candidate_record)
+
+        candidates_results.append({
+            "id": rec_id,
+            **candidate_record,
+            "categorized_skills": categorized,
+            "breakdown": score_data["breakdown"]
+        })
 
     # Rank descending by match_score
     ranked_candidates = sorted(candidates_results, key=lambda c: c["match_score"], reverse=True)
@@ -200,22 +234,43 @@ async def screen_multi_jd(
     candidate_info = parse_candidate_info(raw_text, fallback_name=fallback_name)
     clean_resume = nlp_engine.preprocess_text(raw_text)
     resume_embedding = skill_matcher.get_embedding(clean_resume)
-    cand_skills = nlp_engine.extract_skills(raw_text)
-
-    role_evaluations = []
-
+    # Filter and preprocess all valid JDs in batch
+    valid_jds = []
+    clean_jds = []
     for jd in jds:
         role_name = jd.get("role", "Untitled Role")
-        jd_text = jd.get("jd_text", "")
-        if not jd_text.strip():
+        jd_text = jd.get("jd_text", "").strip()
+        if not jd_text:
             continue
-
-        clean_jd = nlp_engine.preprocess_text(jd_text)
+        clean_text = nlp_engine.preprocess_text(jd_text)
         jd_skills = nlp_engine.extract_skills(jd_text)
-        jd_embedding = skill_matcher.get_embedding(clean_jd)
+        valid_jds.append({
+            "role": role_name,
+            "jd_text": jd_text,
+            "clean_jd": clean_text,
+            "jd_skills": jd_skills
+        })
+        clean_jds.append(clean_text)
 
-        if resume_embedding is not None and jd_embedding is not None:
-            sim = skill_matcher.calculate_similarity_from_embeddings(resume_embedding, jd_embedding)
+    if not valid_jds:
+        raise HTTPException(status_code=400, detail="No valid job descriptions provided.")
+
+    all_target_skills = list(set([s for vjd in valid_jds for s in vjd['jd_skills']]))
+    cand_skills = nlp_engine.extract_skills(raw_text, additional_skills=all_target_skills)
+
+    # Batch compute embeddings for all JDs in ONE single pass
+    jd_embeddings = skill_matcher.get_embeddings(clean_jds) if (skill_matcher.model and clean_jds) else None
+
+    role_evaluations = []
+    exp_factor = min(candidate_info["years_experience"], 10.0) / 10.0
+
+    for idx, vjd in enumerate(valid_jds):
+        role_name = vjd["role"]
+        clean_jd = vjd["clean_jd"]
+        jd_skills = vjd["jd_skills"]
+
+        if resume_embedding is not None and jd_embeddings is not None:
+            sim = skill_matcher.calculate_similarity_from_embeddings(resume_embedding, jd_embeddings[idx])
         else:
             sim = skill_matcher.calculate_similarity_texts(clean_resume, clean_jd)
 
@@ -224,7 +279,6 @@ async def screen_multi_jd(
         missing_skills = match_res["missing"]
         skill_score = sim if not jd_skills else (match_res["match_percentage"] / 100.0)
 
-        exp_factor = min(candidate_info["years_experience"], 10.0) / 10.0
         score_data = skill_matcher.calculate_composite_score({
             "semantic_similarity": sim,
             "skill_match": skill_score,

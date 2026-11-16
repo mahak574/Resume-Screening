@@ -1,9 +1,17 @@
 import pdfplumber
-import PyPDF2
-import docx
 import io
 import re
+import importlib
 from datetime import datetime
+
+pypdf = None
+try:
+    import pypdf
+except ImportError:
+    try:
+        pypdf = importlib.import_module("PyPDF2")
+    except ImportError:
+        pypdf = None
 
 MONTH_MAP = {
     'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
@@ -13,8 +21,20 @@ MONTH_MAP = {
 }
 
 def extract_text_from_pdf(file_bytes):
-    """Extracts text from a PDF file using pdfplumber, fallback to PyPDF2."""
+    """Extracts text from a PDF file using fast pypdf, fallback to pdfplumber."""
     text = ""
+    if pypdf:
+        try:
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+            if len(text.strip()) > 30:
+                return text
+        except Exception:
+            pass
+
     try:
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             for page in pdf.pages:
@@ -22,14 +42,7 @@ def extract_text_from_pdf(file_bytes):
                 if page_text:
                     text += page_text + "\n"
     except Exception as e:
-        try:
-            reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
-            for page in reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
-        except Exception as e2:
-            print(f"Failed to read PDF: {e2}")
+        print(f"Failed to read PDF: {e}")
     return text
 
 def extract_text_from_docx(file_bytes):
