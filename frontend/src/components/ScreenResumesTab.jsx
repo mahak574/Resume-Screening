@@ -1,9 +1,17 @@
 import React, { useState } from 'react';
 import { 
   Upload, FileText, X, Sparkles, Filter, Download, 
-  Award, Mail, Eye, ChevronRight, CheckCircle2, AlertTriangle 
+  Award, Mail, Eye, ChevronRight, CheckCircle2, AlertTriangle,
+  Sliders, UserCheck, Users, Briefcase
 } from 'lucide-react';
 import { api } from '../services/api';
+
+const THRESHOLD_PRESETS = [
+  { label: 'Lenient', value: 45, desc: 'Broad candidate pool' },
+  { label: 'Standard', value: 60, desc: 'Balanced requirements' },
+  { label: 'High Priority', value: 75, desc: 'Strict core criteria' },
+  { label: 'Top Tier', value: 85, desc: 'Elite match only' },
+];
 
 export default function ScreenResumesTab({ 
   onOpenDetails, 
@@ -21,6 +29,8 @@ export default function ScreenResumesTab({
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [threshold, setThreshold] = useState(60);
+  const [filterView, setFilterView] = useState('shortlisted'); // 'shortlisted' | 'all'
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleFileChange = (e) => {
     if (e.target.files) {
@@ -29,8 +39,21 @@ export default function ScreenResumesTab({
     }
   };
 
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files) {
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      setFiles((prev) => [...prev, ...droppedFiles]);
+    }
+  };
+
   const removeFile = (index) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllFiles = () => {
+    setFiles([]);
   };
 
   const handleAnalyze = async (e) => {
@@ -67,11 +90,14 @@ export default function ScreenResumesTab({
 
   const handleExportCSV = () => {
     if (!results || !results.candidates) return;
-    const headers = ['Candidate Name', 'Role', 'Match Score (%)', 'Experience (Years)', 'Email', 'Phone', 'Matched Skills', 'Missing Skills'];
-    const rows = results.candidates.map((c) => [
+    const candidatesToExport = filterView === 'shortlisted' ? filteredCandidates : results.candidates;
+    const headers = ['Rank', 'Candidate Name', 'Role', 'Match Score (%)', 'Status', 'Experience (Years)', 'Email', 'Phone', 'Matched Skills', 'Missing Skills'];
+    const rows = candidatesToExport.map((c, i) => [
+      i + 1,
       `"${c.name}"`,
       `"${c.role || role}"`,
       c.match_score,
+      c.match_score >= threshold ? 'Shortlisted' : 'Below Cutoff',
       c.years_experience || 0,
       `"${c.email || ''}"`,
       `"${c.phone || ''}"`,
@@ -90,67 +116,108 @@ export default function ScreenResumesTab({
   };
 
   const filteredCandidates = results?.candidates?.filter((c) => c.match_score >= threshold) || [];
+  const displayCandidates = results?.candidates ? (filterView === 'shortlisted' ? filteredCandidates : results.candidates) : [];
+
+  const getScoreBadge = (score) => {
+    if (score >= 75) return 'score-high';
+    if (score >= 50) return 'score-med';
+    return 'score-low';
+  };
+
+  const getInitials = (name) => {
+    if (!name) return 'CD';
+    return name.split(' ').map((p) => p[0]).join('').substring(0, 2).toUpperCase();
+  };
 
   return (
     <div style={{ maxWidth: '1280px', margin: '0 auto', padding: '0 24px 40px' }}>
       
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px, 440px) 1fr', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px, 460px) 1fr', gap: '28px' }}>
         
-        {/* Left Column: Form */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        {/* Left Column: Form & Configuration */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
           
+          {/* Step 1: Job Description */}
           <div className="card">
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={20} color="#6366f1" /> 1. Job Description
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '9px', color: '#0f172a' }}>
+              <div style={{ background: '#eef2ff', padding: '6px', borderRadius: '8px' }}>
+                <Sparkles size={18} color="#4f46e5" />
+              </div>
+              1. Job Description & Role
             </h2>
 
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: 600 }}>Target Role</label>
+              <label style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Target Role Title</label>
               <input 
                 value={role} 
                 onChange={(e) => setRole(e.target.value)} 
                 placeholder="e.g. Senior Backend Engineer"
-                style={{ marginTop: '4px' }}
+                style={{ marginTop: '5px' }}
               />
             </div>
 
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: 600 }}>Job Description Text</label>
+              <label style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Job Description Text</label>
               <textarea 
                 rows={5} 
                 value={jdText} 
                 onChange={(e) => setJdText(e.target.value)}
-                placeholder="Paste the job requirements..."
-                style={{ marginTop: '4px', resize: 'vertical' }}
+                placeholder="Paste the job requirements and responsibilities..."
+                style={{ marginTop: '5px', resize: 'vertical' }}
               />
             </div>
 
             <div>
-              <label style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: 600 }}>
-                Target Skills (Optional Override, Comma-Separated)
+              <label style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>
+                Required Skills Override (Optional)
               </label>
               <input 
                 value={reqSkills} 
                 onChange={(e) => setReqSkills(e.target.value)}
                 placeholder="e.g. python, react, aws, docker"
-                style={{ marginTop: '4px' }}
+                style={{ marginTop: '5px' }}
               />
+              <span style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                Leave empty to let the AI automatically extract all skills from the JD.
+              </span>
             </div>
           </div>
 
+          {/* Step 2: Upload Resumes */}
           <div className="card">
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Upload size={20} color="#818cf8" /> 2. Upload Resumes
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '9px', color: '#0f172a' }}>
+                <div style={{ background: '#ecfdf5', padding: '6px', borderRadius: '8px' }}>
+                  <Upload size={18} color="#059669" />
+                </div>
+                2. Upload Candidate Resumes
+              </h2>
+              {files.length > 0 && (
+                <button 
+                  type="button" 
+                  onClick={clearAllFiles} 
+                  className="btn btn-secondary" 
+                  style={{ padding: '4px 10px', fontSize: '0.75rem' }}
+                >
+                  Clear All ({files.length})
+                </button>
+              )}
+            </div>
 
-            <div style={{
-              border: '2px dashed #374151',
-              borderRadius: '12px',
-              padding: '24px 16px',
-              textAlign: 'center',
-              background: '#0b0f19',
-              cursor: 'pointer'
-            }}>
+            <div 
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              style={{
+                border: isDragging ? '2px dashed #4f46e5' : '2px dashed #cbd5e1',
+                borderRadius: '12px',
+                padding: '24px 16px',
+                textAlign: 'center',
+                background: isDragging ? '#eef2ff' : '#f8fafc',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
               <input 
                 type="file" 
                 multiple 
@@ -160,12 +227,12 @@ export default function ScreenResumesTab({
                 id="batch-resume-input"
               />
               <label htmlFor="batch-resume-input" style={{ cursor: 'pointer', display: 'block' }}>
-                <Upload size={28} color="#6366f1" style={{ margin: '0 auto 8px' }} />
-                <div style={{ fontWeight: 600, color: '#e5e7eb', fontSize: '0.9rem' }}>
-                  Click to browse resumes
+                <Upload size={32} color={isDragging ? '#4f46e5' : '#6366f1'} style={{ margin: '0 auto 10px' }} />
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '0.92rem' }}>
+                  Click to browse or drag & drop resumes here
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '4px' }}>
-                  Accepts PDF, DOCX, TXT (Multiple files supported)
+                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '5px' }}>
+                  Supports PDF, DOCX, TXT • Bulk resume ranking
                 </div>
               </label>
             </div>
@@ -173,119 +240,239 @@ export default function ScreenResumesTab({
             {files.length > 0 && (
               <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto' }}>
                 {files.map((f, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#1f2937', padding: '6px 12px', borderRadius: '6px', fontSize: '0.82rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                      <FileText size={15} color="#818cf8" />
-                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{f.name}</span>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f1f5f9', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '8px', fontSize: '0.84rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '9px', overflow: 'hidden' }}>
+                      <FileText size={16} color="#4f46e5" />
+                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontWeight: 600, color: '#1e293b' }}>{f.name}</span>
                     </div>
-                    <button type="button" onClick={() => removeFile(i)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}>
-                      <X size={14} />
+                    <button type="button" onClick={() => removeFile(i)} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '2px' }}>
+                      <X size={15} />
                     </button>
                   </div>
                 ))}
               </div>
             )}
+          </div>
 
+          {/* Step 3: Upfront Qualification Threshold Selection */}
+          <div className="card">
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '9px', color: '#0f172a' }}>
+              <div style={{ background: '#fffbeb', padding: '6px', borderRadius: '8px' }}>
+                <Sliders size={18} color="#d97706" />
+              </div>
+              3. Set Cutoff Threshold
+            </h2>
+
+            <p style={{ fontSize: '0.82rem', color: '#64748b', marginBottom: '14px' }}>
+              Candidates meeting or exceeding this match score will be marked as <strong>Shortlisted</strong>.
+            </p>
+
+            {/* Quick Preset Buttons */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '16px' }}>
+              {THRESHOLD_PRESETS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  className={`preset-chip ${threshold === p.value ? 'active' : ''}`}
+                  onClick={() => setThreshold(p.value)}
+                  style={{ textAlign: 'center', padding: '8px 4px' }}
+                >
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>{p.value}%</div>
+                  <div style={{ fontSize: '0.68rem', opacity: 0.85, marginTop: '2px' }}>{p.label}</div>
+                </button>
+              ))}
+            </div>
+
+            {/* Interactive Slider & Number Input */}
+            <div style={{ background: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155' }}>Custom Cutoff:</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <input 
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={threshold}
+                    onChange={(e) => setThreshold(Math.max(0, Math.min(100, Number(e.target.value))))}
+                    style={{ width: '64px', textAlign: 'center', padding: '4px 6px', fontWeight: 700, fontSize: '0.95rem' }}
+                  />
+                  <span style={{ fontWeight: 700, color: '#4f46e5' }}>%</span>
+                </div>
+              </div>
+              <input 
+                type="range" 
+                min="0" 
+                max="100" 
+                value={threshold} 
+                onChange={(e) => setThreshold(Number(e.target.value))}
+                style={{ width: '100%' }}
+              />
+            </div>
+
+            {/* Submit Action */}
             <button 
               className="btn btn-primary" 
-              style={{ width: '100%', marginTop: '20px' }} 
+              style={{ width: '100%', marginTop: '20px', padding: '12px', fontSize: '0.92rem' }} 
               disabled={loading || files.length === 0}
               onClick={handleAnalyze}
             >
-              {loading ? 'Evaluating Resumes & Embeddings...' : `🚀 Analyze & Rank Candidates (${files.length})`}
+              {loading ? (
+                <>
+                  <div className="spinner" /> Analyzing Resumes with SBERT...
+                </>
+              ) : (
+                `🚀 Screen & Rank Candidates (${files.length})`
+              )}
             </button>
           </div>
 
         </div>
 
-        {/* Right Column: Results Dashboard */}
+        {/* Right Column: Results & Interactive Filtering Dashboard */}
         <div>
           {!results ? (
-            <div className="card" style={{ textAlign: 'center', padding: '60px 24px', color: '#9ca3af' }}>
+            <div className="card" style={{ textAlign: 'center', padding: '80px 24px', color: '#64748b' }}>
               <div style={{ 
-                background: '#1f2937', 
-                width: '60px', 
-                height: '60px', 
+                background: '#eef2ff', 
+                width: '68px', 
+                height: '68px', 
                 borderRadius: '50%', 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center', 
-                margin: '0 auto 16px' 
+                margin: '0 auto 18px',
+                border: '1px solid #c7d2fe'
               }}>
-                <Sparkles size={28} color="#6366f1" />
+                <Sparkles size={32} color="#4f46e5" />
               </div>
-              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', marginBottom: '8px' }}>
-                Candidate Intelligence Center
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
+                AI Screening Dashboard
               </h3>
-              <p style={{ maxWidth: '420px', margin: '0 auto', fontSize: '0.88rem' }}>
-                Upload candidate resumes and a job description on the left to extract skills, calculate semantic similarity, and rank applicants contextually.
+              <p style={{ maxWidth: '440px', margin: '0 auto', fontSize: '0.9rem', lineHeight: '1.6' }}>
+                Fill in the job requirements, set your qualification threshold cutoff, and upload candidate resumes to view automated ranking, skill matches, and gaps.
               </p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
-              {/* Shortlist Filter & Export Bar */}
-              <div className="card" style={{ padding: '16px 20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              {/* Interactive Cutoff Controller & Filters Bar */}
+              <div className="card" style={{ padding: '18px 22px', border: '1px solid #c7d2fe', background: '#ffffff' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '14px' }}>
                   
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: '280px' }}>
-                    <Filter size={18} color="#818cf8" />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '4px' }}>
-                        <span>Shortlist Threshold</span>
-                        <strong style={{ color: '#818cf8' }}>{threshold}%</strong>
-                      </div>
-                      <input 
-                        type="range" 
-                        min="0" 
-                        max="100" 
-                        value={threshold} 
-                        onChange={(e) => setThreshold(Number(e.target.value))}
-                        style={{ width: '100%', accentColor: '#6366f1' }}
-                      />
-                    </div>
-                    <span className="badge badge-success" style={{ fontSize: '0.85rem' }}>
-                      {filteredCandidates.length} of {results.candidates.length} Qualified
-                    </span>
+                  {/* Left: View Toggle */}
+                  <div style={{ display: 'flex', gap: '4px', background: '#f1f5f9', padding: '4px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                    <button 
+                      type="button"
+                      className={`btn ${filterView === 'shortlisted' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ 
+                        padding: '6px 14px', 
+                        fontSize: '0.82rem',
+                        border: filterView === 'shortlisted' ? 'none' : 'none',
+                        background: filterView === 'shortlisted' ? undefined : 'transparent',
+                        boxShadow: filterView === 'shortlisted' ? undefined : 'none'
+                      }}
+                      onClick={() => setFilterView('shortlisted')}
+                    >
+                      <UserCheck size={15} /> Shortlisted ({filteredCandidates.length})
+                    </button>
+                    <button 
+                      type="button"
+                      className={`btn ${filterView === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ 
+                        padding: '6px 14px', 
+                        fontSize: '0.82rem',
+                        border: filterView === 'all' ? 'none' : 'none',
+                        background: filterView === 'all' ? undefined : 'transparent',
+                        boxShadow: filterView === 'all' ? undefined : 'none'
+                      }}
+                      onClick={() => setFilterView('all')}
+                    >
+                      <Users size={15} /> All Screened ({results.candidates.length})
+                    </button>
                   </div>
 
+                  {/* Right: Export Button */}
                   <button className="btn btn-secondary" onClick={handleExportCSV}>
-                    <Download size={16} /> Export CSV
+                    <Download size={15} /> Export CSV
                   </button>
+                </div>
 
+                {/* Real-time Threshold Slider Bar */}
+                <div style={{ background: '#f8fafc', padding: '14px 18px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Filter size={16} color="#4f46e5" />
+                      <span style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0f172a' }}>Adjust Threshold in Real-Time:</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span className="badge badge-success" style={{ fontSize: '0.82rem' }}>
+                        {filteredCandidates.length} of {results.candidates.length} Qualified
+                      </span>
+                      <strong style={{ fontSize: '1.1rem', color: '#4f46e5', fontFamily: 'var(--font-mono)' }}>
+                        {threshold}%
+                      </strong>
+                    </div>
+                  </div>
+
+                  <input 
+                    type="range" 
+                    min="0" 
+                    max="100" 
+                    value={threshold} 
+                    onChange={(e) => setThreshold(Number(e.target.value))}
+                    style={{ width: '100%' }}
+                  />
+
+                  {/* Preset Pills */}
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                    {THRESHOLD_PRESETS.map((p) => (
+                      <button
+                        key={p.value}
+                        type="button"
+                        onClick={() => setThreshold(p.value)}
+                        className={`preset-chip ${threshold === p.value ? 'active' : ''}`}
+                        style={{ padding: '3px 9px', fontSize: '0.72rem' }}
+                      >
+                        {p.value}% ({p.label})
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* #1 Top Candidate Spotlight */}
+              {/* Top Candidate Spotlight (if any meets threshold) */}
               {filteredCandidates.length > 0 && (
                 <div style={{ 
-                  background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(16, 185, 129, 0.15))', 
-                  border: '1px solid rgba(99, 102, 241, 0.4)', 
-                  borderRadius: '14px', 
-                  padding: '20px' 
+                  background: 'linear-gradient(135deg, #eef2ff 0%, #ecfdf5 100%)', 
+                  border: '1px solid #c7d2fe', 
+                  borderRadius: '16px', 
+                  padding: '22px',
+                  boxShadow: '0 4px 16px rgba(79, 70, 229, 0.08)'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                        <span className="badge badge-success">🏆 Top Ranked Applicant</span>
-                        <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>{filteredCandidates[0].years_experience || 0} yrs experience</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '14px' }}>
+                    <div style={{ flex: 1, minWidth: '280px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <span className="badge badge-success">🏆 #1 Top Ranked Match</span>
+                        <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
+                          • {filteredCandidates[0].years_experience || 0} yrs experience
+                        </span>
                       </div>
-                      <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>{filteredCandidates[0].name}</h2>
-                      <p style={{ fontSize: '0.85rem', color: '#e5e7eb', marginTop: '4px', maxWidth: '550px' }}>
+                      <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: '#0f172a' }}>{filteredCandidates[0].name}</h2>
+                      <p style={{ fontSize: '0.88rem', color: '#334155', marginTop: '6px', maxWidth: '580px', lineHeight: '1.5' }}>
                         {filteredCandidates[0].explanation}
                       </p>
                     </div>
 
                     <div style={{ textAlign: 'right' }}>
-                      <div className="score-pill score-high" style={{ fontSize: '1.5rem', padding: '6px 16px' }}>
+                      <div className="score-pill score-high" style={{ fontSize: '1.6rem', padding: '6px 18px' }}>
                         {filteredCandidates[0].match_score}%
                       </div>
-                      <div style={{ marginTop: '8px', display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                        <button className="btn btn-primary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => onOpenEmail(filteredCandidates[0])}>
-                          <Mail size={14} /> Invite
+                      <div style={{ marginTop: '10px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button className="btn btn-primary" style={{ padding: '7px 14px', fontSize: '0.82rem' }} onClick={() => onOpenEmail(filteredCandidates[0])}>
+                          <Mail size={14} /> Invite Candidate
                         </button>
-                        <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '0.8rem' }} onClick={() => onOpenDetails(filteredCandidates[0])}>
-                          <Eye size={14} /> Profile
+                        <button className="btn btn-secondary" style={{ padding: '7px 14px', fontSize: '0.82rem' }} onClick={() => onOpenDetails(filteredCandidates[0])}>
+                          <Eye size={14} /> Full Details
                         </button>
                       </div>
                     </div>
@@ -293,91 +480,112 @@ export default function ScreenResumesTab({
                 </div>
               )}
 
-              {/* Candidate Cards List */}
+              {/* Candidates List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {filteredCandidates.map((c, idx) => {
-                  const scoreClass = c.match_score >= 75 ? 'score-high' : c.match_score >= 50 ? 'score-med' : 'score-low';
-                  return (
-                    <div 
-                      key={c.id || idx} 
-                      className="card"
-                      style={{ 
-                        padding: '16px 20px', 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center', 
-                        flexWrap: 'wrap', 
-                        gap: '14px' 
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '240px' }}>
-                        <div style={{ 
-                          width: '40px', 
-                          height: '40px', 
-                          borderRadius: '10px', 
-                          background: '#1f2937', 
+                {displayCandidates.length === 0 ? (
+                  <div className="card" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                    <AlertTriangle size={32} color="#d97706" style={{ margin: '0 auto 10px' }} />
+                    <h3 style={{ color: '#0f172a', fontSize: '1.1rem', fontWeight: 700 }}>No Candidates Met the {threshold}% Threshold</h3>
+                    <p style={{ fontSize: '0.85rem', marginTop: '6px' }}>
+                      Try lowering the cutoff slider above or switch to <strong>"All Screened"</strong> to inspect every applicant.
+                    </p>
+                  </div>
+                ) : (
+                  displayCandidates.map((c, idx) => {
+                    const isShortlisted = c.match_score >= threshold;
+                    return (
+                      <div 
+                        key={c.id || idx} 
+                        className="card"
+                        style={{ 
+                          padding: '18px 22px', 
+                          border: isShortlisted ? '1px solid #e2e8f0' : '1px dashed #fca5a5',
+                          background: isShortlisted ? '#ffffff' : '#fffbfa',
                           display: 'flex', 
+                          justifyContent: 'space-between', 
                           alignItems: 'center', 
-                          justifyContent: 'center', 
-                          fontWeight: 800,
-                          color: '#818cf8'
-                        }}>
-                          #{idx + 1}
-                        </div>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontWeight: 700, fontSize: '1.05rem', color: '#fff' }}>{c.name}</span>
-                            <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>• {c.years_experience || 0} yrs exp</span>
+                          flexWrap: 'wrap', 
+                          gap: '16px' 
+                        }}
+                      >
+                        {/* Candidate Identity */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: '260px' }}>
+                          <div style={{ 
+                            width: '44px', 
+                            height: '44px', 
+                            borderRadius: '12px', 
+                            background: isShortlisted ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : '#cbd5e1', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'center', 
+                            fontWeight: 800,
+                            color: '#fff',
+                            fontSize: '0.95rem'
+                          }}>
+                            {getInitials(c.name)}
                           </div>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
-                            {c.matched_skills && c.matched_skills.slice(0, 4).map((s) => (
-                              <span key={s} className="badge badge-success" style={{ fontSize: '0.7rem' }}>{s}</span>
-                            ))}
-                            {c.matched_skills && c.matched_skills.length > 4 && (
-                              <span className="badge badge-neutral" style={{ fontSize: '0.7rem' }}>
-                                +{c.matched_skills.length - 4}
-                              </span>
-                            )}
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>{c.name}</span>
+                              <span style={{ fontSize: '0.78rem', color: '#64748b' }}>• {c.years_experience || 0} yrs exp</span>
+                              {isShortlisted ? (
+                                <span className="badge badge-success">Qualified</span>
+                              ) : (
+                                <span className="badge badge-warning">Below {threshold}%</span>
+                              )}
+                            </div>
+                            
+                            {/* Skills badges */}
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '7px' }}>
+                              {c.matched_skills && c.matched_skills.slice(0, 4).map((s) => (
+                                <span key={s} className="badge badge-success" style={{ fontSize: '0.72rem' }}>{s}</span>
+                              ))}
+                              {c.matched_skills && c.matched_skills.length > 4 && (
+                                <span className="badge badge-neutral" style={{ fontSize: '0.72rem' }}>
+                                  +{c.matched_skills.length - 4} more
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Score & Actions */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <div className={`score-pill ${scoreClass}`}>
-                          {c.match_score}%
+                        {/* Score & Actions */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                          <div className={`score-pill ${getScoreBadge(c.match_score)}`}>
+                            {c.match_score}%
+                          </div>
+
+                          <div style={{ display: 'flex', gap: '7px' }}>
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ padding: '8px' }} 
+                              title="Skills Gap Breakdown"
+                              onClick={() => onOpenGaps(c)}
+                            >
+                              <Award size={16} />
+                            </button>
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ padding: '8px' }} 
+                              title="Send Email"
+                              onClick={() => onOpenEmail(c)}
+                            >
+                              <Mail size={16} />
+                            </button>
+                            <button 
+                              className="btn btn-primary" 
+                              style={{ padding: '8px 14px', fontSize: '0.82rem' }}
+                              onClick={() => onOpenDetails(c)}
+                            >
+                              Details <ChevronRight size={14} />
+                            </button>
+                          </div>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          <button 
-                            className="btn btn-secondary" 
-                            style={{ padding: '7px' }} 
-                            title="Skills Gap Analysis"
-                            onClick={() => onOpenGaps(c)}
-                          >
-                            <Award size={16} />
-                          </button>
-                          <button 
-                            className="btn btn-secondary" 
-                            style={{ padding: '7px' }} 
-                            title="Generate Outreach Email"
-                            onClick={() => onOpenEmail(c)}
-                          >
-                            <Mail size={16} />
-                          </button>
-                          <button 
-                            className="btn btn-primary" 
-                            style={{ padding: '7px 12px', fontSize: '0.8rem' }}
-                            onClick={() => onOpenDetails(c)}
-                          >
-                            Details <ChevronRight size={14} />
-                          </button>
-                        </div>
                       </div>
-
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
 
             </div>
@@ -389,4 +597,3 @@ export default function ScreenResumesTab({
     </div>
   );
 }
-

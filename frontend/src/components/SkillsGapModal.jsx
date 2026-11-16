@@ -11,11 +11,11 @@ export default function SkillsGapModal({ candidate, learningResources, onClose }
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>
               Skills Gap & Learning Roadmap
             </h2>
-            <p style={{ fontSize: '0.85rem', color: '#9ca3af' }}>
-              Candidate: <strong style={{ color: '#fff' }}>{candidate.name}</strong> • Role: {candidate.role || 'General'}
+            <p style={{ fontSize: '0.85rem', color: '#64748b' }}>
+              Candidate: <strong style={{ color: '#0f172a' }}>{candidate.name}</strong> • Role: {candidate.role || 'General'}
             </p>
           </div>
           <button onClick={onClose} className="btn btn-secondary" style={{ padding: '6px' }}>
@@ -25,15 +25,15 @@ export default function SkillsGapModal({ candidate, learningResources, onClose }
 
         {/* Matched Skills by Category */}
         <div style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#34d399', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#059669', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
             <CheckCircle size={18} /> Matched Skills ({candidate.matched_skills?.length || 0})
           </h3>
           
           {candidate.categorized_skills && Object.keys(candidate.categorized_skills).length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {Object.entries(candidate.categorized_skills).map(([cat, skills]) => (
-                <div key={cat} style={{ background: '#1f2937', padding: '10px 14px', borderRadius: '8px', border: '1px solid #374151' }}>
-                  <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#9ca3af', fontWeight: 700, marginBottom: '6px' }}>
+                <div key={cat} style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '0.74rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, marginBottom: '6px', letterSpacing: '0.04em' }}>
                     {cat.replace('_', ' ')}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -53,7 +53,7 @@ export default function SkillsGapModal({ candidate, learningResources, onClose }
                   <span key={s} className="badge badge-success">{s}</span>
                 ))
               ) : (
-                <span style={{ color: '#9ca3af', fontSize: '0.85rem' }}>No exact skills matched.</span>
+                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>No exact skills matched.</span>
               )}
             </div>
           )}
@@ -61,7 +61,7 @@ export default function SkillsGapModal({ candidate, learningResources, onClose }
 
         {/* Missing Skills with Learning Links */}
         <div>
-          <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#f87171', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#dc2626', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
             <AlertCircle size={18} /> Missing Target Skills ({candidate.missing_skills?.length || 0})
           </h3>
 
@@ -74,8 +74,8 @@ export default function SkillsGapModal({ candidate, learningResources, onClose }
                   <div 
                     key={skill} 
                     style={{ 
-                      background: 'rgba(239, 68, 68, 0.08)', 
-                      border: '1px solid rgba(239, 68, 68, 0.25)', 
+                      background: '#fef2f2', 
+                      border: '1px solid #fecaca', 
                       padding: '10px 14px', 
                       borderRadius: '8px',
                       display: 'flex',
@@ -84,10 +84,10 @@ export default function SkillsGapModal({ candidate, learningResources, onClose }
                     }}
                   >
                     <div>
-                      <span style={{ fontWeight: 600, color: '#fca5a5', fontSize: '0.9rem' }}>
+                      <span style={{ fontWeight: 700, color: '#991b1b', fontSize: '0.9rem' }}>
                         {skill}
                       </span>
-                      <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Recommended course</div>
+                      <div style={{ fontSize: '0.74rem', color: '#64748b' }}>Curated learning guide</div>
                     </div>
                     <a 
                       href={url} 
@@ -103,7 +103,7 @@ export default function SkillsGapModal({ candidate, learningResources, onClose }
               })}
             </div>
           ) : (
-            <div style={{ padding: '16px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '8px', color: '#34d399', textAlign: 'center' }}>
+            <div style={{ padding: '16px', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', color: '#047857', textAlign: 'center', fontWeight: 600 }}>
               🎉 Candidate satisfies all target skills for this job description!
             </div>
           )}
@@ -119,4 +119,3 @@ export default function SkillsGapModal({ candidate, learningResources, onClose }
     </div>
   );
 }
-

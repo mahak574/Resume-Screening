@@ -1,7 +1,8 @@
 import axios from 'axios';
 
-// When running with Vite proxy or production, relative '/api' works cleanly
-const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000/api' : '/api';
+// Dynamically target port 8000 on local or proxy relative '/api'
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const API_BASE_URL = isLocal ? `http://${window.location.hostname}:8000/api` : '/api';
 
 export const api = {
   // Screen multiple resumes against one JD

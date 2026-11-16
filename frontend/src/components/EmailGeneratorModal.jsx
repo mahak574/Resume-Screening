@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Copy, Check, Mail, Send } from 'lucide-react';
+import { X, Copy, Check, Mail } from 'lucide-react';
 import { api } from '../services/api';
 
 export default function EmailGeneratorModal({ candidate, onClose }) {
@@ -48,12 +48,12 @@ export default function EmailGeneratorModal({ candidate, onClose }) {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ background: '#6366f1', padding: '8px', borderRadius: '8px' }}>
-              <Mail size={20} color="#fff" />
+            <div style={{ background: '#eef2ff', padding: '8px', borderRadius: '8px' }}>
+              <Mail size={20} color="#4f46e5" />
             </div>
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Outreach Email Generator</h2>
-              <p style={{ fontSize: '0.8rem', color: '#9ca3af' }}>To: {candidate.name} ({candidate.email || 'No email detected'})</p>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>Outreach Email Composer</h2>
+              <p style={{ fontSize: '0.8rem', color: '#64748b' }}>Recipient: {candidate.name} ({candidate.email || 'No email detected'})</p>
             </div>
           </div>
           <button onClick={onClose} className="btn btn-secondary" style={{ padding: '6px' }}>
@@ -64,6 +64,7 @@ export default function EmailGeneratorModal({ candidate, onClose }) {
         {/* Email Type Selector */}
         <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
           <button 
+            type="button"
             className={`btn ${emailType === 'interview' ? 'btn-primary' : 'btn-secondary'}`}
             style={{ flex: 1, padding: '8px' }}
             onClick={() => setEmailType('interview')}
@@ -71,6 +72,7 @@ export default function EmailGeneratorModal({ candidate, onClose }) {
             🎉 Interview Invitation
           </button>
           <button 
+            type="button"
             className={`btn ${emailType === 'rejection' ? 'btn-danger' : 'btn-secondary'}`}
             style={{ flex: 1, padding: '8px' }}
             onClick={() => setEmailType('rejection')}
@@ -81,36 +83,36 @@ export default function EmailGeneratorModal({ candidate, onClose }) {
 
         {/* Subject */}
         <div style={{ marginBottom: '12px' }}>
-          <label style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: 600 }}>Subject</label>
+          <label style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Subject</label>
           <input 
             value={subject} 
             onChange={(e) => setSubject(e.target.value)}
-            style={{ marginTop: '4px' }}
+            style={{ marginTop: '4px', background: '#f8fafc' }}
           />
         </div>
 
         {/* Body */}
         <div style={{ marginBottom: '16px' }}>
-          <label style={{ fontSize: '0.8rem', color: '#9ca3af', fontWeight: 600 }}>Email Body</label>
+          <label style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 600 }}>Email Body</label>
           <textarea 
             rows={10} 
             value={body} 
             onChange={(e) => setBody(e.target.value)}
-            style={{ marginTop: '4px', resize: 'vertical', fontFamily: 'inherit' }}
+            style={{ marginTop: '4px', resize: 'vertical', background: '#f8fafc' }}
           />
         </div>
 
         {/* Footer actions */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', color: '#9ca3af' }}>
-            {candidate.email ? `Recipient: ${candidate.email}` : 'No email detected in resume'}
+          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+            {candidate.email ? `Target: ${candidate.email}` : 'No email address detected'}
           </span>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button className="btn btn-secondary" onClick={onClose}>
               Cancel
             </button>
             <button className="btn btn-primary" onClick={handleCopy} disabled={loading}>
-              {copied ? <><Check size={16} /> Copied!</> : <><Copy size={16} /> Copy to Clipboard</>}
+              {copied ? <><Check size={16} /> Copied to Clipboard!</> : <><Copy size={16} /> Copy Full Email</>}
             </button>
           </div>
         </div>
@@ -119,4 +121,3 @@ export default function EmailGeneratorModal({ candidate, onClose }) {
     </div>
   );
 }
-

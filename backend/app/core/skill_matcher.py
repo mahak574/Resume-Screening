@@ -53,11 +53,21 @@ class SkillMatcher:
         """Lazy load SentenceTransformer model."""
         if self._sbert_model is None:
             try:
+                import os
+                os.environ.setdefault("HF_HUB_OFFLINE", "1")
+                os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
                 from sentence_transformers import SentenceTransformer
                 self._sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
-            except Exception as e:
-                print(f"Could not load SentenceTransformer: {e}. Will use TF-IDF fallback.")
-                self._sbert_model = False
+            except Exception:
+                try:
+                    import os
+                    os.environ.pop("HF_HUB_OFFLINE", None)
+                    os.environ.pop("TRANSFORMERS_OFFLINE", None)
+                    from sentence_transformers import SentenceTransformer
+                    self._sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
+                except Exception as e2:
+                    print(f"Could not load SentenceTransformer: {e2}. Will use TF-IDF fallback.")
+                    self._sbert_model = False
         return self._sbert_model
 
     def get_embedding(self, text: str) -> Optional[np.ndarray]:

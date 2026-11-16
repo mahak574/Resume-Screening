@@ -13,6 +13,13 @@ except ImportError:
     except ImportError:
         pypdf = None
 
+MONTH_MAP = {
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+    'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+    'january': 1, 'february': 2, 'march': 3, 'april': 4, 'june': 6,
+    'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12
+}
+
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
     """Extracts text from a PDF file using pdfplumber, with fallback to pypdf."""
@@ -68,6 +75,86 @@ def extract_text(filename: str, file_bytes: bytes) -> str:
     return ""
 
 
+def parse_experience_years(text: str) -> float:
+    """
+    Accurately extracts years of work experience:
+    - Checks for explicit phrase 'X years of experience'.
+    - If not found, isolates ONLY the WORK EXPERIENCE section (excluding Education & Projects)
+      so college/high-school graduation years are NEVER counted as work experience.
+    """
+    now = datetime.now()
+    current_year = now.year
+    current_month = now.month
+
+    # 1. Explicit phrase "X years of experience"
+    exp_phrase_match = re.search(
+        r'(\d+(?:\.\d+)?)\+?\s*(?:years? of experience|years? experience|yrs? of exp|yrs? exp)',
+        text, re.IGNORECASE
+    )
+    if exp_phrase_match:
+        try:
+            return float(exp_phrase_match.group(1))
+        except ValueError:
+            pass
+
+    # 2. Extract ONLY the Experience / Employment section
+    # Prevents counting dates from EDUCATION (e.g. 2023 - 2027) or PROJECTS (e.g. 2026)
+    section_headers = r'(?:EDUCATION|ACADEMIC|TECHNICAL SKILLS|SKILLS|PROJECTS|CERTIFICATIONS|ACHIEVEMENTS|PUBLICATIONS|AWARDS|DECLARATION)'
+    exp_pattern = rf'(?:^|\n)\s*(?:EXPERIENCE|WORK EXPERIENCE|PROFESSIONAL EXPERIENCE|EMPLOYMENT HISTORY|INTERNSHIP EXPERIENCE)\b\s*[:\n]?(.*?)(?=(?:\n\s*{section_headers}\b)|\Z)'
+    match = re.search(exp_pattern, text, re.IGNORECASE | re.DOTALL)
+
+    target_text = match.group(1) if match else ''
+    if not target_text.strip():
+        return 0.0
+
+    month_regex = r'(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
+    date_ranges = []
+
+    # Pattern A: Month Year - Month Year / Present (e.g. 'Jul 2026 – Present' or 'Jan 2021 - Dec 2023')
+    month_year_pattern = rf'({month_regex})\.?\s+(20\d{{2}}|19\d{{2}})\s*(?:-|–|to)\s*(?:({month_regex})\.?\s+)?(20\d{{2}}|present|current)\b'
+    for m in re.finditer(month_year_pattern, target_text, re.IGNORECASE):
+        start_m_str, start_y_str, end_m_str, end_y_str = m.groups()
+        start_m = MONTH_MAP.get(start_m_str.lower(), 1)
+        start_y = int(start_y_str)
+
+        if end_y_str.lower() in ['present', 'current']:
+            end_y = current_year
+            end_m = current_month
+        else:
+            end_y = int(end_y_str)
+            end_m = MONTH_MAP.get(end_m_str.lower(), 12) if end_m_str else 12
+
+        start_val = start_y + (start_m - 1) / 12.0
+        end_val = end_y + end_m / 12.0
+        if end_val >= start_val:
+            date_ranges.append((start_val, end_val))
+
+    # Pattern B: Simple Year - Year / Present inside the Experience section (e.g. '2023 - 2024')
+    if not date_ranges:
+        year_pattern = r'\b(20\d{2}|19\d{2})\s*(?:-|–|to)\s*(20\d{2}|present|current)\b'
+        for m in re.finditer(year_pattern, target_text, re.IGNORECASE):
+            start_y = int(m.group(1))
+            end_val_str = m.group(2).lower()
+            end_y = current_year if end_val_str in ['present', 'current'] else int(end_val_str)
+            if start_y <= end_y <= current_year + 1:
+                date_ranges.append((float(start_y), float(end_y)))
+
+    if not date_ranges:
+        return 0.0
+
+    # Merge overlapping intervals
+    sorted_ranges = sorted(date_ranges, key=lambda x: x[0])
+    merged = []
+    for r in sorted_ranges:
+        if not merged or merged[-1][1] < r[0]:
+            merged.append(r)
+        else:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], r[1]))
+
+    total_years = sum(r[1] - r[0] for r in merged)
+    return round(max(0.0, min(total_years, 35.0)), 1)
+
+
 def parse_candidate_info(text: str, fallback_name: str = "Unknown") -> Dict[str, Any]:
     """
     Parses candidate text to extract:
@@ -75,7 +162,7 @@ def parse_candidate_info(text: str, fallback_name: str = "Unknown") -> Dict[str,
     - Email
     - Phone (including international formats)
     - LinkedIn & GitHub
-    - Years of Experience (explicit mentions or year range calculations)
+    - Years of Experience (isolated to Work Experience section)
     """
     info = {
         "name": fallback_name,
@@ -105,7 +192,7 @@ def parse_candidate_info(text: str, fallback_name: str = "Unknown") -> Dict[str,
         clean_line = re.sub(r'[\w\.-]+@[\w\.-]+\.\w+', '', clean_line).strip()
         clean_line = re.sub(r'https?://\S+', '', clean_line).strip()
 
-        # Handle letter-spaced names e.g. "J o h n  D o e"
+        # Handle letter-spaced names e.g. "M a h a k  S i n g h"
         parts = clean_line.split()
         if len(parts) > 2 and all(len(p) == 1 for p in parts):
             clean_line = "".join(parts)
@@ -141,46 +228,7 @@ def parse_candidate_info(text: str, fallback_name: str = "Unknown") -> Dict[str,
     if github_match:
         info["github"] = github_match.group(0)
 
-    # 6. Experience Extraction
-    # Case A: Explicit phrase "X years of experience"
-    exp_phrase_match = re.search(
-        r'(\d+(?:\.\d+)?)\+?\s*(?:years? of experience|years? experience|yrs? of exp|yrs? exp)',
-        text, re.IGNORECASE
-    )
-    if exp_phrase_match:
-        try:
-            info["years_experience"] = float(exp_phrase_match.group(1))
-        except ValueError:
-            pass
-
-    # Case B: If explicit phrase not found, infer from date ranges (e.g. 2019 - 2024, 2021 - Present)
-    if info["years_experience"] == 0.0:
-        current_year = datetime.now().year
-        year_ranges = re.findall(r'\b(20\d{2}|19\d{2})\s*(?:-|–|to)\s*(20\d{2}|present|current)\b', text, re.IGNORECASE)
-        total_months = 0
-        found_years = set()
-        for start_str, end_str in year_ranges:
-            try:
-                start_yr = int(start_str)
-                end_yr = current_year if end_str.lower() in ['present', 'current'] else int(end_str)
-                if 1980 <= start_yr <= current_year and start_yr <= end_yr <= current_year + 1:
-                    span = end_yr - start_yr
-                    if span > 0:
-                        found_years.add((start_yr, end_yr))
-            except ValueError:
-                continue
-
-        if found_years:
-            # Approximate total non-overlapping duration
-            sorted_ranges = sorted(list(found_years), key=lambda x: x[0])
-            merged = []
-            for r in sorted_ranges:
-                if not merged or merged[-1][1] < r[0]:
-                    merged.append(r)
-                else:
-                    merged[-1] = (merged[-1][0], max(merged[-1][1], r[1]))
-            total_yoe = sum(r[1] - r[0] for r in merged)
-            info["years_experience"] = round(min(total_yoe, 35.0), 1)
+    # 6. Experience Extraction (Section-Aware)
+    info["years_experience"] = parse_experience_years(text)
 
     return info
-

@@ -112,7 +112,12 @@ async def screen_resumes(
             match_res = skill_matcher.match_skills(cand_skills, target_jd_skills)
             matched_skills = [m["skill"] for m in match_res["matched"]]
             missing_skills = match_res["missing"]
-            skill_score = match_res["match_percentage"] / 100.0
+            
+            # If no specific skills detected in JD, align skill score with overall semantic fit
+            if not target_jd_skills:
+                skill_score = semantic_similarity
+            else:
+                skill_score = match_res["match_percentage"] / 100.0
 
             # Experience factor (capped at 10 years = 1.0)
             exp_factor = min(candidate_info["years_experience"], 10.0) / 10.0
@@ -217,7 +222,7 @@ async def screen_multi_jd(
         match_res = skill_matcher.match_skills(cand_skills, jd_skills)
         matched_skills = [m["skill"] for m in match_res["matched"]]
         missing_skills = match_res["missing"]
-        skill_score = match_res["match_percentage"] / 100.0
+        skill_score = sim if not jd_skills else (match_res["match_percentage"] / 100.0)
 
         exp_factor = min(candidate_info["years_experience"], 10.0) / 10.0
         score_data = skill_matcher.calculate_composite_score({

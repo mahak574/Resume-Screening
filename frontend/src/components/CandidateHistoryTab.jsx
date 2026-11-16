@@ -51,21 +51,21 @@ export default function CandidateHistoryTab({ onOpenDetails, onOpenEmail, onOpen
       <div className="card" style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>Candidate Screening Repository</h2>
-            <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>
-              Persistent records saved via SQLite / MongoDB
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Candidate Screening Repository</h2>
+            <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
+              Persistent candidate records saved via SQLite & MongoDB
             </p>
           </div>
 
-          <form onSubmit={handleSearch} style={{ display: 'flex', gap: '10px', minWidth: '320px' }}>
+          <form onSubmit={handleSearch} style={{ display: 'flex', gap: '8px', minWidth: '320px' }}>
             <div style={{ position: 'relative', width: '100%' }}>
               <input 
                 placeholder="Search candidate name, email, or role..." 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                style={{ paddingLeft: '34px' }}
+                style={{ paddingLeft: '34px', background: '#f8fafc' }}
               />
-              <Search size={16} color="#9ca3af" style={{ position: 'absolute', left: '10px', top: '12px' }} />
+              <Search size={16} color="#64748b" style={{ position: 'absolute', left: '10px', top: '12px' }} />
             </div>
             <button type="submit" className="btn btn-secondary">
               Search
@@ -76,7 +76,7 @@ export default function CandidateHistoryTab({ onOpenDetails, onOpenEmail, onOpen
               onClick={() => { setSearch(''); fetchCandidates(''); }}
               title="Refresh"
             >
-              <RefreshCw size={16} />
+              <RefreshCw size={15} />
             </button>
           </form>
         </div>
@@ -85,11 +85,11 @@ export default function CandidateHistoryTab({ onOpenDetails, onOpenEmail, onOpen
       {/* Candidates Table */}
       <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>
+          <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
             Loading candidates repository...
           </div>
         ) : candidates.length === 0 ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>
+          <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>
             <AlertCircle size={32} color="#f59e0b" style={{ margin: '0 auto 10px' }} />
             <p>No candidates found in past screenings.</p>
           </div>
@@ -97,7 +97,7 @@ export default function CandidateHistoryTab({ onOpenDetails, onOpenEmail, onOpen
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
               <thead>
-                <tr style={{ background: '#111827', borderBottom: '1px solid #374151', color: '#9ca3af', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   <th style={{ padding: '14px 18px' }}>Candidate Name</th>
                   <th style={{ padding: '14px 18px' }}>Applied Role</th>
                   <th style={{ padding: '14px 18px' }}>Match Score</th>
@@ -109,20 +109,20 @@ export default function CandidateHistoryTab({ onOpenDetails, onOpenEmail, onOpen
               </thead>
               <tbody>
                 {candidates.map((c) => (
-                  <tr key={c.id} style={{ borderBottom: '1px solid #1f2937', transition: 'background 0.15s' }}>
+                  <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}>
                     <td style={{ padding: '14px 18px', fontWeight: 600 }}>
-                      <div style={{ color: '#fff' }}>{c.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{c.email || 'No email'}</div>
+                      <div style={{ color: '#0f172a' }}>{c.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{c.email || 'No email'}</div>
                     </td>
-                    <td style={{ padding: '14px 18px', color: '#e5e7eb' }}>
+                    <td style={{ padding: '14px 18px', color: '#334155' }}>
                       <span className="badge badge-neutral">{c.role || 'General'}</span>
                     </td>
                     <td style={{ padding: '14px 18px' }}>
-                      <span className={`score-pill ${getScoreBadge(c.match_score)}`} style={{ fontSize: '0.9rem', padding: '2px 8px' }}>
+                      <span className={`score-pill ${getScoreBadge(c.match_score)}`} style={{ fontSize: '0.88rem', padding: '2px 8px' }}>
                         {c.match_score}%
                       </span>
                     </td>
-                    <td style={{ padding: '14px 18px', color: '#9ca3af' }}>
+                    <td style={{ padding: '14px 18px', color: '#64748b' }}>
                       {c.years_experience ? `${c.years_experience} yrs` : '0 yrs'}
                     </td>
                     <td style={{ padding: '14px 18px' }}>
@@ -137,7 +137,7 @@ export default function CandidateHistoryTab({ onOpenDetails, onOpenEmail, onOpen
                         )}
                       </div>
                     </td>
-                    <td style={{ padding: '14px 18px', color: '#9ca3af', fontSize: '0.8rem' }}>
+                    <td style={{ padding: '14px 18px', color: '#64748b', fontSize: '0.8rem' }}>
                       {c.timestamp ? c.timestamp.split(' ')[0] : 'N/A'}
                     </td>
                     <td style={{ padding: '14px 18px', textAlign: 'right' }}>
@@ -187,4 +187,3 @@ export default function CandidateHistoryTab({ onOpenDetails, onOpenEmail, onOpen
     </div>
   );
 }
-

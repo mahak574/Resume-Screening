@@ -68,6 +68,27 @@ if st.sidebar.button("Logout"):
 # Multi-JD Mode Toggle
 multi_jd_mode = st.sidebar.toggle("🔄 Multi-JD Mode (find best role for one candidate)", value=False)
 
+# Qualification Threshold Controls in Sidebar
+st.sidebar.markdown("---")
+st.sidebar.subheader("🎯 Qualification Threshold")
+threshold_preset = st.sidebar.radio(
+    "Quick Preset:", 
+    ["60% (Standard)", "45% (Lenient)", "75% (High Priority)", "85% (Top Tier)", "Custom"],
+    index=0
+)
+if "45%" in threshold_preset:
+    preset_val = 45
+elif "60%" in threshold_preset:
+    preset_val = 60
+elif "75%" in threshold_preset:
+    preset_val = 75
+elif "85%" in threshold_preset:
+    preset_val = 85
+else:
+    preset_val = 60
+
+selected_threshold = st.sidebar.slider("Minimum Shortlist Score (%)", min_value=0, max_value=100, value=preset_val)
+
 # Main layout with Tabs
 tab1, tab2 = st.tabs(["🔍 Screen Resumes", "📁 Past Screenings"])
 
@@ -260,8 +281,8 @@ with tab1:
             st.markdown("---")
             st.header("3. Candidate Ranking Dashboard")
             
-            # Shortlisting Slider
-            shortlist_threshold = st.slider("Shortlist Threshold (%)", min_value=0, max_value=100, value=60)
+            # Shortlisting Slider (synced with sidebar preset)
+            shortlist_threshold = st.slider("Shortlist Threshold (%)", min_value=0, max_value=100, value=selected_threshold)
             df_filtered = df[df["Match Percentage (%)"] >= shortlist_threshold].sort_values(by="Match Percentage (%)", ascending=False).reset_index(drop=True)
             
             st.metric(label="Shortlisted Candidates", value=f"{len(df_filtered)} of {len(df)}")

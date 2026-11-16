@@ -43,7 +43,30 @@ def test_pdf_processor():
     assert info["name"] == "Priya Sharma", f"Expected Priya Sharma, got {info['name']}"
     assert info["email"] == "priya.sharma@example.com"
     assert "9876543210" in info["phone"]
-    assert info["years_experience"] >= 4.0, f"Expected at least 4.0 years, got {info['years_experience']}"
+    assert info["years_experience"] == 4.0, f"Expected 4.0 years, got {info['years_experience']}"
+
+    # Test student/intern resume (Mahak Singh)
+    mahak_resume = """
+    MAHAK SINGH
+    Sonipat, Haryana | +91 8505972309 | mahaks2402@gmail.com | LinkedIn | GitHub
+    SUMMARY
+    Computer Science undergraduate with hands-on experience in machine learning.
+    EDUCATION
+    Deenbandhu Chhotu Ram University of Science and Technology 2023 – 2027
+    B.Tech, Computer Science Engineering | Sonipat, Haryana
+    Saraswati Shiksha Sansthan Senior Secondary School 2022 – 2023
+    Class XII | 90% | Sonipat, Haryana
+    EXPERIENCE
+    Data Science & ML Intern | Centre for Railway Information Systems Jul 2026 – Present
+    TECHNICAL SKILLS
+    Python, FastAPI, React
+    PROJECTS
+    1. Aditya-L1 2026
+    """
+    mahak_info = parse_candidate_info(mahak_resume, fallback_name="Mahak")
+    print("Mahak Parsed Info:", mahak_info)
+    assert mahak_info["name"] == "Mahak Singh"
+    assert mahak_info["years_experience"] < 1.0, f"Expected intern experience < 1.0 year, but got {mahak_info['years_experience']}"
     print("PDF Processor test PASSED!")
 
 def test_skill_matcher():
