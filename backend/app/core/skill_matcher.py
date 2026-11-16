@@ -12,6 +12,7 @@ def normalize_skill(skill: str) -> str:
     return clean
 
 _SKILL_EMBED_CACHE: Dict[str, np.ndarray] = {}
+_DOC_EMBED_CACHE: Dict[int, np.ndarray] = {}
 
 class SkillMatcher:
     # Rich synonym & alias dictionary
@@ -94,12 +95,17 @@ class SkillMatcher:
 
     @property
     def model(self):
-        """Lazy load SentenceTransformer model."""
+        """Lazy load SentenceTransformer model with optimized intra-op threading."""
         if self._sbert_model is None:
             try:
                 import os
                 os.environ.setdefault("HF_HUB_OFFLINE", "1")
                 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+                import torch
+                try:
+                    torch.set_num_threads(4)
+                except Exception:
+                    pass
                 from sentence_transformers import SentenceTransformer
                 self._sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
             except Exception:
@@ -115,18 +121,51 @@ class SkillMatcher:
         return self._sbert_model
 
     def get_embedding(self, text: str) -> Optional[np.ndarray]:
-        """Generate embedding vector for a single text."""
+        """Generate embedding vector for a single text with fast caching and truncation."""
+        if not text:
+            return None
+        words = text.split()
+        truncated = " ".join(words[:400]) if len(words) > 400 else text
+        h = hash(truncated)
+        if h in _DOC_EMBED_CACHE:
+            return _DOC_EMBED_CACHE[h]
         if self.model:
-            return self.model.encode(text)
+            emb = self.model.encode(truncated, show_progress_bar=False)
+            _DOC_EMBED_CACHE[h] = emb
+            return emb
         return None
 
     def get_embeddings(self, texts: List[str]) -> Optional[np.ndarray]:
-        """Generate embeddings array for a list of texts."""
+        """Generate embeddings array for a list of texts with batched caching and truncation."""
         if not texts:
             return None
-        if self.model:
-            return self.model.encode(texts)
-        return None
+        results = [None] * len(texts)
+        uncached_indices = []
+        uncached_texts = []
+
+        for i, t in enumerate(texts):
+            if not t:
+                continue
+            words = t.split()
+            truncated = " ".join(words[:400]) if len(words) > 400 else t
+            h = hash(truncated)
+            if h in _DOC_EMBED_CACHE:
+                results[i] = _DOC_EMBED_CACHE[h]
+            else:
+                uncached_indices.append(i)
+                uncached_texts.append(truncated)
+
+        if uncached_texts and self.model:
+            new_embs = self.model.encode(uncached_texts, batch_size=32, show_progress_bar=False)
+            for idx, t_trunc, emb in zip(uncached_indices, uncached_texts, new_embs):
+                _DOC_EMBED_CACHE[hash(t_trunc)] = emb
+                results[idx] = emb
+
+        for i in range(len(results)):
+            if results[i] is None:
+                results[i] = np.zeros(384, dtype=np.float32)
+
+        return np.array(results)
 
     def calculate_similarity_from_embeddings(self, emb_a: np.ndarray, emb_b: np.ndarray) -> float:
         """Fast cosine similarity between two precomputed embeddings."""
@@ -221,40 +260,57 @@ class SkillMatcher:
             if rev_found:
                 continue
 
+            # 4. Contextual substring match (e.g. 'gaap' <-> 'gaap compliance', 'seo' in 'search engine optimization (seo)')
+            sub_matches = [res_skill for res_skill in norm_resume if (job_skill in res_skill or res_skill in job_skill) and len(job_skill) >= 3 and len(res_skill) >= 3]
+            if sub_matches:
+                matched.append({
+                    "skill": job_skill,
+                    "type": "exact",
+                    "score": 0.95,
+                    "matched_with": sub_matches[0]
+                })
+                continue
+
             unmatched_job.append(job_skill)
 
         # 4. Semantic similarity fallback ONLY for remaining unmatched job skills
         missing = []
         if unmatched_job and norm_resume and self.model:
-            # Batch encode any skills missing from cache
-            uncached = [s for s in (unmatched_job + norm_resume) if s not in _SKILL_EMBED_CACHE]
-            if uncached:
-                try:
-                    new_embs = self.model.encode(uncached, batch_size=32, show_progress_bar=False)
-                    for s, emb in zip(uncached, new_embs):
-                        _SKILL_EMBED_CACHE[s] = emb
-                except Exception:
-                    pass
+            matched_candidate_skills = {m["matched_with"] for m in matched}
+            available_resume_skills = [s for s in norm_resume if s not in matched_candidate_skills]
 
-            # Build resume embedding matrix from cache
-            res_embs_list = [_SKILL_EMBED_CACHE[s] for s in norm_resume if s in _SKILL_EMBED_CACHE]
-            if res_embs_list:
-                res_matrix = np.array(res_embs_list)
-                for job_skill in unmatched_job:
-                    if job_skill in _SKILL_EMBED_CACHE:
-                        j_emb = _SKILL_EMBED_CACHE[job_skill].reshape(1, -1)
-                        sims = cosine_similarity(res_matrix, j_emb).flatten()
-                        best_idx = int(np.argmax(sims))
-                        best_score = float(sims[best_idx])
-                        if best_score >= threshold:
-                            matched.append({
-                                "skill": job_skill,
-                                "type": "semantic",
-                                "score": round(best_score, 2),
-                                "matched_with": norm_resume[best_idx]
-                            })
-                            continue
-                    missing.append(job_skill)
+            if available_resume_skills:
+                # Batch encode only skills missing from cache
+                uncached = [s for s in (unmatched_job + available_resume_skills) if s not in _SKILL_EMBED_CACHE]
+                if uncached:
+                    try:
+                        new_embs = self.model.encode(uncached, batch_size=32, show_progress_bar=False)
+                        for s, emb in zip(uncached, new_embs):
+                            _SKILL_EMBED_CACHE[s] = emb
+                    except Exception:
+                        pass
+
+                # Build available resume embedding matrix from cache
+                res_embs_list = [_SKILL_EMBED_CACHE[s] for s in available_resume_skills if s in _SKILL_EMBED_CACHE]
+                if res_embs_list:
+                    res_matrix = np.array(res_embs_list)
+                    for job_skill in unmatched_job:
+                        if job_skill in _SKILL_EMBED_CACHE:
+                            j_emb = _SKILL_EMBED_CACHE[job_skill].reshape(1, -1)
+                            sims = cosine_similarity(res_matrix, j_emb).flatten()
+                            best_idx = int(np.argmax(sims))
+                            best_score = float(sims[best_idx])
+                            if best_score >= threshold:
+                                matched.append({
+                                    "skill": job_skill,
+                                    "type": "semantic",
+                                    "score": round(best_score, 2),
+                                    "matched_with": available_resume_skills[best_idx]
+                                })
+                                continue
+                        missing.append(job_skill)
+                else:
+                    missing.extend(unmatched_job)
             else:
                 missing.extend(unmatched_job)
         else:

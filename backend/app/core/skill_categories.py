@@ -22,9 +22,9 @@ class SkillCategorizer:
                 print(f"Error indexing skills_db: {e}")
 
     def categorize_skills(self, skills: List[str]) -> Dict[str, List[str]]:
-        """Groups a list of skills into their categories."""
+        """Groups a list of skills into their categories, universally supporting dynamic domain skills."""
         categorized: Dict[str, List[str]] = {cat: [] for cat in self.skills_db.keys()}
-        categorized["other"] = []
+        categorized["domain_competencies"] = []
 
         for skill in skills:
             s_clean = skill.lower().strip()
@@ -43,7 +43,7 @@ class SkillCategorizer:
                     break
 
             if not matched:
-                categorized["other"].append(skill)
+                categorized["domain_competencies"].append(skill)
 
         # Return only categories that have skills
         return {cat: sorted(list(set(items))) for cat, items in categorized.items() if items}
