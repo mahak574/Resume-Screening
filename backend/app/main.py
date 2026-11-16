@@ -1,3 +1,4 @@
+import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -5,11 +6,8 @@ from .api.routes import router as api_router, skill_matcher
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Pre-warm SBERT model and skill vector cache on boot to eliminate first-request latency
-    try:
-        skill_matcher.warmup()
-    except Exception as e:
-        print(f"Lifespan warmup warning: {e}")
+    # Prime SBERT engine in a non-blocking daemon thread so the server is instantly available
+    threading.Thread(target=skill_matcher.warmup, daemon=True).start()
     yield
 
 app = FastAPI(

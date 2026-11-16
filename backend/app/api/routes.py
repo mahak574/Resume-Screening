@@ -93,6 +93,8 @@ async def screen_resumes(
 
     # Precompute JD embedding once
     jd_embedding = skill_matcher.get_embedding(clean_jd)
+    if target_jd_skills:
+        skill_matcher.precache_skills(target_jd_skills)
 
     # 2. Extract and Preprocess all resumes in batch
     parsed_candidates = []
@@ -258,7 +260,8 @@ async def screen_multi_jd(
     all_target_skills = list(set([s for vjd in valid_jds for s in vjd['jd_skills']]))
     cand_skills = nlp_engine.extract_skills(raw_text, additional_skills=all_target_skills)
 
-    # Batch compute embeddings for all JDs in ONE single pass
+    # Batch compute embeddings for all JDs and skills in ONE single pass
+    skill_matcher.precache_skills(cand_skills + all_target_skills)
     jd_embeddings = skill_matcher.get_embeddings(clean_jds) if (skill_matcher.model and clean_jds) else None
 
     role_evaluations = []

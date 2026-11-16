@@ -417,7 +417,43 @@ export default function ScreenResumesTab({
 
         {/* Right Column: Dashboard & Screening Results */}
         <div>
-          {!results ? (
+          {loading ? (
+            <div className="card" style={{ padding: '56px 32px', textAlign: 'center' }}>
+              <div style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '50%',
+                border: '3px solid #e0e7ff',
+                borderTopColor: '#4f46e5',
+                animation: 'spin 0.8s linear infinite',
+                margin: '0 auto 20px'
+              }} />
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>
+                Analyzing Candidate Resumes...
+              </h3>
+              <p style={{ fontSize: '0.86rem', color: '#64748b', maxWidth: '440px', margin: '0 auto 24px', lineHeight: '1.5' }}>
+                Extracting structured competencies, verifying experience tenure, and computing semantic vector alignment.
+              </p>
+              <div style={{ 
+                display: 'inline-flex', 
+                flexWrap: 'wrap',
+                justifyContent: 'center', 
+                gap: '16px', 
+                fontSize: '0.78rem', 
+                color: '#475569',
+                background: '#f8fafc',
+                padding: '10px 18px',
+                borderRadius: '9999px',
+                border: '1px solid #e2e8f0'
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>⚡ Text Extraction</span>
+                <span style={{ color: '#cbd5e1' }}>•</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>🎯 Competency Matching</span>
+                <span style={{ color: '#cbd5e1' }}>•</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>📊 Contextual Fit Scoring</span>
+              </div>
+            </div>
+          ) : !results ? (
             /* Modern Empty State Showcase */
             <div className="card" style={{ padding: '36px 32px' }}>
               <div style={{ textAlign: 'center', maxWidth: '520px', margin: '0 auto 32px' }}>

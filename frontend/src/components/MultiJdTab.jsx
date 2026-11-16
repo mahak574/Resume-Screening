@@ -152,8 +152,29 @@ export default function MultiJdTab() {
         </div>
       </form>
 
+      {/* Results or Loading Section */}
+      {loading && (
+        <div className="card" style={{ padding: '48px 32px', textAlign: 'center', marginBottom: '24px' }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            border: '3px solid #e0e7ff',
+            borderTopColor: '#4f46e5',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 16px'
+          }} />
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a', marginBottom: '6px' }}>
+            Evaluating Multi-Role Fit...
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: '#64748b', maxWidth: '400px', margin: '0 auto' }}>
+            Cross-matching resume competencies and computing comparative fit across all {jds.length} job roles.
+          </p>
+        </div>
+      )}
+
       {/* Results Section */}
-      {result && (
+      {!loading && result && (
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>

@@ -58,26 +58,12 @@ class SkillMatcher:
         self.categorizer = SkillCategorizer()
 
     def warmup(self):
-        """Warm up SentenceTransformer model and pre-embed standard ontology for sub-millisecond scoring."""
+        """Instant model prime for sub-millisecond execution."""
         if self.model:
-            import json, os
             try:
-                base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                skills_path = os.path.join(base_dir, "data", "skills_db.json")
-                if os.path.exists(skills_path):
-                    with open(skills_path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                    skills_to_embed = []
-                    for cat_skills in data.values():
-                        for s in cat_skills:
-                            norm_s = normalize_skill(s)
-                            if norm_s and norm_s not in _SKILL_EMBED_CACHE:
-                                skills_to_embed.append(norm_s)
-                    if skills_to_embed:
-                        embs = self.model.encode(skills_to_embed, batch_size=64, show_progress_bar=False)
-                        for s, emb in zip(skills_to_embed, embs):
-                            _SKILL_EMBED_CACHE[s] = emb
-                        print(f"SkillMatcher: Successfully cached {len(_SKILL_EMBED_CACHE)} skill embeddings.")
+                # Prime torch computation graph with a minimal dummy string (15ms)
+                self.model.encode("warmup prime", show_progress_bar=False)
+                print("SkillMatcher: SBERT engine primed and ready.")
             except Exception as e:
                 print(f"Skill pre-warmup warning: {e}")
 
@@ -88,29 +74,53 @@ class SkillMatcher:
         if clean in _SKILL_EMBED_CACHE:
             return _SKILL_EMBED_CACHE[clean]
         if self.model:
-            emb = self.model.encode(clean)
+            emb = self.model.encode(clean, show_progress_bar=False)
             _SKILL_EMBED_CACHE[clean] = emb
             return emb
         return None
 
+    def precache_skills(self, skills: List[str]):
+        """Batch encode skills that are not yet in cache in one fast vectorized pass."""
+        uncached = [normalize_skill(s) for s in skills if normalize_skill(s) and normalize_skill(s) not in _SKILL_EMBED_CACHE]
+        if uncached and self.model:
+            try:
+                new_embs = self.model.encode(uncached, batch_size=64, show_progress_bar=False)
+                for s, emb in zip(uncached, new_embs):
+                    _SKILL_EMBED_CACHE[s] = emb
+            except Exception as e:
+                print(f"Precache skills warning: {e}")
+
     @property
     def model(self):
-        """Lazy load SentenceTransformer model with optimized intra-op threading."""
+        """Lazy load SentenceTransformer model from local snapshot directly for zero network latency."""
         if self._sbert_model is None:
+            import os
+            import torch
             try:
-                import os
-                os.environ.setdefault("HF_HUB_OFFLINE", "1")
-                os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-                import torch
-                try:
-                    torch.set_num_threads(4)
-                except Exception:
-                    pass
+                torch.set_num_threads(4)
+            except Exception:
+                pass
+
+            # Check if local snapshot exists in HuggingFace cache to bypass network checks entirely
+            local_model_target = 'all-MiniLM-L6-v2'
+            try:
+                hub_snapshots = os.path.expanduser('~/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2/snapshots')
+                if os.path.exists(hub_snapshots):
+                    snaps = os.listdir(hub_snapshots)
+                    if snaps:
+                        local_model_target = os.path.join(hub_snapshots, snaps[-1])
+            except Exception:
+                pass
+
+            try:
+                os.environ["HF_HUB_OFFLINE"] = "1"
+                os.environ["TRANSFORMERS_OFFLINE"] = "1"
+                os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
                 from sentence_transformers import SentenceTransformer
-                self._sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
+                is_local = os.path.isdir(local_model_target)
+                self._sbert_model = SentenceTransformer(local_model_target, local_files_only=is_local)
             except Exception:
                 try:
-                    import os
                     os.environ.pop("HF_HUB_OFFLINE", None)
                     os.environ.pop("TRANSFORMERS_OFFLINE", None)
                     from sentence_transformers import SentenceTransformer
@@ -121,11 +131,11 @@ class SkillMatcher:
         return self._sbert_model
 
     def get_embedding(self, text: str) -> Optional[np.ndarray]:
-        """Generate embedding vector for a single text with fast caching and truncation."""
+        """Generate embedding vector for a single text with fast caching and 200-word truncation."""
         if not text:
             return None
         words = text.split()
-        truncated = " ".join(words[:400]) if len(words) > 400 else text
+        truncated = " ".join(words[:200]) if len(words) > 200 else text
         h = hash(truncated)
         if h in _DOC_EMBED_CACHE:
             return _DOC_EMBED_CACHE[h]
@@ -136,7 +146,7 @@ class SkillMatcher:
         return None
 
     def get_embeddings(self, texts: List[str]) -> Optional[np.ndarray]:
-        """Generate embeddings array for a list of texts with batched caching and truncation."""
+        """Generate embeddings array for a list of texts with batched caching and 200-word truncation."""
         if not texts:
             return None
         results = [None] * len(texts)
@@ -147,7 +157,7 @@ class SkillMatcher:
             if not t:
                 continue
             words = t.split()
-            truncated = " ".join(words[:400]) if len(words) > 400 else t
+            truncated = " ".join(words[:200]) if len(words) > 200 else t
             h = hash(truncated)
             if h in _DOC_EMBED_CACHE:
                 results[i] = _DOC_EMBED_CACHE[h]
