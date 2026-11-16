@@ -1,102 +1,82 @@
-import spacy
-import nltk
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
+import json
 import re
 import os
+from typing import List, Set, Dict
 
-# --- Initialization & Model Loading ---
+SKILLS_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "skills_db.json")
 
-# Ensure NLTK data is downloaded
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords')
-try:
-    nltk.data.find('corpora/wordnet')
-except LookupError:
-    nltk.download('wordnet')
+SPECIAL_TECH_REPLACEMENTS = {
+    r'\bc\+\+\b': 'cpp',
+    r'\bc#\b': 'csharp',
+    r'\b\.net\b': 'dotnet',
+    r'\bnode\.js\b': 'nodejs',
+    r'\bvue\.js\b': 'vuejs',
+    r'\breact\.js\b': 'reactjs',
+    r'\bci\/cd\b': 'cicd',
+}
 
-# Ensure SpaCy model is loaded
-    nlp = spacy.load("en_core_web_sm")
+def load_skills_database() -> Set[str]:
+    skills = set()
+    if os.path.exists(SKILLS_DB_PATH):
+        try:
+            with open(SKILLS_DB_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                for cat, skill_list in data.items():
+                    for s in skill_list:
+                        skills.add(s.strip().lower())
+        except Exception as e:
+            print(f"Error reading skills_db.json: {e}")
+    if not skills:
+        skills = {
+            "python", "java", "c++", "c#", "javascript", "typescript", "html", "css",
+            "sql", "nosql", "mongodb", "mysql", "postgresql", "react", "angular", "vue",
+            "node.js", "django", "flask", "fastapi", "spring boot", "aws", "azure", "gcp",
+            "docker", "kubernetes", "machine learning", "nlp", "pandas", "numpy", "git"
+        }
+    return skills
 
-lemmatizer = WordNetLemmatizer()
-stop_words = set(stopwords.words('english'))
+ALL_SKILLS = load_skills_database()
 
-# --- Core NLP Functions ---
+def preprocess_text(text: str) -> str:
+    """Cleans and preprocesses text while preserving special tech symbols."""
+    if not text:
+        return ""
+    clean = text.lower()
+    for pat, rep in SPECIAL_TECH_REPLACEMENTS.items():
+        clean = re.sub(pat, rep, clean, flags=re.IGNORECASE)
+    clean = re.sub(r'[^a-zA-Z\s]', ' ', clean)
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    return clean
 
-def preprocess_text(text):
-    """
-    Cleans and preprocesses the text.
-    - Lowercasing
-    - Removing special characters and numbers
-    - Tokenization & Stopword removal
-    - Lemmatization
-    """
-    # Lowercase
-    text = text.lower()
-    # Remove non-alphabet characters
-    text = re.sub(r'[^a-zA-Z\s]', '', text)
-    
-    # Tokenization and Lemmatization
-    tokens = text.split()
-    tokens = [lemmatizer.lemmatize(word) for word in tokens if word not in stop_words]
-    
-    return " ".join(tokens)
-
-# --- Skill Extraction & Analysis ---
-
-def extract_skills(text):
-    """
-    Extracts skills using a predefined dictionary and SpaCy POS tagging.
-    In a production ATS, this would be backed by a comprehensive skills ontology.
-    """
-    # A comprehensive but simple list of common tech/soft skills
-    tech_skills = [
-        "python", "java", "c++", "c#", "javascript", "typescript", "html", "css",
-        "sql", "nosql", "mongodb", "mysql", "postgresql", "react", "angular", "vue",
-        "node.js", "django", "flask", "spring boot", "aws", "azure", "gcp", "docker",
-        "kubernetes", "machine learning", "nlp", "artificial intelligence", "data science",
-        "pandas", "numpy", "scikit-learn", "tensorflow", "pytorch", "git", "ci/cd",
-        "agile", "scrum", "communication", "leadership", "problem solving"
-    ]
-    
-    found_skills = set()
+def extract_skills(text: str) -> List[str]:
+    """Extracts skills from text matching against the full skills ontology."""
+    if not text:
+        return []
     text_lower = text.lower()
-    
-    # Keyword matching
-    for skill in tech_skills:
-        # Regex boundary to match exact words/phrases
-        if re.search(rf'\b{re.escape(skill)}\b', text_lower):
-            found_skills.add(skill)
-            
-    # SpaCy NLP Named Entity Recognition as fallback / additions
-    doc = nlp(text)
-    for ent in doc.ents:
-        # Sometimes ORG or PRODUCT represents software/skills (e.g. 'Docker', 'Microsoft')
-        if ent.label_ in ['ORG', 'PRODUCT'] and ent.text.lower() not in found_skills:
-            # We filter it slightly to avoid long garbage entities
-            if len(ent.text.split()) <= 2: 
-                pass # Un-comment to enable broad NER capture: found_skills.add(ent.text.lower())
-                
-    return list(found_skills)
+    found = set()
+    for skill in ALL_SKILLS:
+        s_clean = skill.strip().lower()
+        if any(ch in s_clean for ch in ['+', '#', '.', '/']):
+            escaped = re.escape(s_clean)
+            if re.search(rf'(?:(?<=[\s,;\(])|^){escaped}(?=[,\s\.;\)]|$)', text_lower):
+                found.add(s_clean)
+        else:
+            escaped = re.escape(s_clean)
+            if re.search(rf'\b{escaped}\b', text_lower):
+                found.add(s_clean)
+    return sorted(list(found))
 
-def identify_missing_skills(resume_skills, jd_skills):
-    """Identifies skills present in JD but missing in the resume."""
-    return list(set(jd_skills) - set(resume_skills))
+def identify_missing_skills(resume_skills: List[str], jd_skills: List[str]) -> List[str]:
+    cand_set = {s.lower().strip() for s in resume_skills}
+    return [s for s in jd_skills if s.lower().strip() not in cand_set]
 
-def explain_match(matched_skills, jd_skills):
-    """Provides a basic explainable AI output string based on pre-matched skills."""
-    matched_skills = list(matched_skills) if matched_skills else []
-    jd_skills = list(jd_skills) if jd_skills else []
-
-    if not jd_skills or len(jd_skills) == 0:
+def explain_match(matched_skills: List[str], jd_skills: List[str]) -> str:
+    matched = list(matched_skills) if matched_skills else []
+    jd = list(jd_skills) if jd_skills else []
+    if not jd:
         return "No specific skills detected in Job Description."
-        
-    skill_match_percentage = len(matched_skills) / len(jd_skills) * 100
-    
-    explanation = f"Matched {len(matched_skills)} out of {len(jd_skills)} key skills ({skill_match_percentage:.0f}%). "
-    if matched_skills:
-        explanation += f"Strong indicators: {', '.join(matched_skills[:3])}."
-        
-    return explanation
+    pct = len(matched) / len(jd) * 100
+    res = f"Matched {len(matched)} of {len(jd)} key skills ({pct:.0f}%)."
+    if matched:
+        res += f" Strongest matches: {', '.join(matched[:3])}."
+    return res

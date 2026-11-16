@@ -99,10 +99,11 @@ class NLPEngine:
 
         for skill in self.all_skills:
             normalized_skill = skill.lower().strip()
-            # Handle special symbols like c++, c#
-            if normalized_skill in ["c++", "c#", ".net", "node.js", "ci/cd"]:
+            # Handle special symbols like c++, c#, .net, ci/cd
+            if any(ch in normalized_skill for ch in ['+', '#', '.', '/']):
                 escaped = re.escape(normalized_skill)
-                if re.search(rf'(?:\b|^){escaped}(?:\b|$|\s|[,\.;])', text_lower):
+                pattern = rf'(?:(?<=[\s,;\(])|^){escaped}(?=[,\s\.;\)]|$)'
+                if re.search(pattern, text_lower):
                     found_skills.add(normalized_skill)
             else:
                 escaped = re.escape(normalized_skill)

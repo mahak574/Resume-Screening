@@ -73,3 +73,4 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSettings, analyt
     </header>
   );
 }
+

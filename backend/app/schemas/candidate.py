@@ -42,3 +42,4 @@ class EmailGenerationRequest(BaseModel):
 class EmailGenerationResponse(BaseModel):
     subject: str
     body: str
+

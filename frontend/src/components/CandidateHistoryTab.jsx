@@ -187,3 +187,4 @@ export default function CandidateHistoryTab({ onOpenDetails, onOpenEmail, onOpen
     </div>
   );
 }
+

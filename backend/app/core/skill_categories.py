@@ -47,3 +47,4 @@ class SkillCategorizer:
 
         # Return only categories that have skills
         return {cat: sorted(list(set(items))) for cat, items in categorized.items() if items}
+

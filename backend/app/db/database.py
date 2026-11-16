@@ -182,3 +182,4 @@ class Database:
                 "top_matched_skills": top_skills,
                 "db_engine": "MongoDB + SQLite" if self.mongo_collection is not None else "SQLite (Local)"
             }
+

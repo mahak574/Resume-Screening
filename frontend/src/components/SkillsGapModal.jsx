@@ -119,3 +119,4 @@ export default function SkillsGapModal({ candidate, learningResources, onClose }
     </div>
   );
 }
+

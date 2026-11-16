@@ -119,3 +119,4 @@ export default function EmailGeneratorModal({ candidate, onClose }) {
     </div>
   );
 }
+

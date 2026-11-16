@@ -14,3 +14,4 @@ DEFAULT_WEIGHTS = {
     "skill_match": 0.60,
     "experience_factor": 0.15
 }
+

@@ -229,3 +229,4 @@ class SkillMatcher:
             },
             "applied_weights": norm_weights
         }
+

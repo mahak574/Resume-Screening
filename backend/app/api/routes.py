@@ -303,3 +303,4 @@ Best regards,
 Talent Acquisition Team"""
 
     return EmailGenerationResponse(subject=subject, body=body)
+

@@ -183,3 +183,4 @@ def parse_candidate_info(text: str, fallback_name: str = "Unknown") -> Dict[str,
             info["years_experience"] = round(min(total_yoe, 35.0), 1)
 
     return info
+
