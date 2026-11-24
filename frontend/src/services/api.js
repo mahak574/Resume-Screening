@@ -1,8 +1,10 @@
 import axios from 'axios';
 
-// Dynamically target port 8000 on local or proxy relative '/api'
+// Dynamically target custom API_URL (from Vercel env), local port 8000, or proxy relative '/api'
 const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const API_BASE_URL = isLocal ? `http://${window.location.hostname}:8000/api` : '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL
+  ? (import.meta.env.VITE_API_URL.endsWith('/api') ? import.meta.env.VITE_API_URL : `${import.meta.env.VITE_API_URL}/api`)
+  : (isLocal ? `http://${window.location.hostname}:8000/api` : '/api');
 
 export const api = {
   // Screen multiple resumes against one JD
